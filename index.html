@@ -2,22 +2,177 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DEBUG — Ant Poster</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DEBUG — Digital Art Exhibition 2026</title>
+<meta name="description" content="DEBUG 연세대학교 디지털아트 졸업전시 2026 · 12.3–12.6 · 무악로터리 B1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=block" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  html, body { margin: 0; height: 100%; background: #0a0a0a; overflow: hidden; overscroll-behavior: none; }
-  /* 폰 주소창 높이 차이로 터치 좌표가 어긋나지 않게 화면에 고정 */
-  canvas { position: fixed; inset: 0; display: block; width: 100%; height: 100%;
-           touch-action: none; cursor: crosshair; -webkit-user-select: none; user-select: none;
-           -webkit-tap-highlight-color: transparent; }
+  :root {
+    --bg: #000;
+    --fg: #f4f2ee;
+    --dim: rgba(244, 242, 238, 0.55);
+    --faint: rgba(244, 242, 238, 0.14);
+    --mono: "Space Mono", "IBM Plex Sans KR", ui-monospace, monospace;
+    --sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); color: var(--fg); scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans);
+         -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  body.locked { overflow: hidden; }
+
+  /* ---------- 1. 포스터 ---------- */
+  #poster { position: relative; height: 100vh; height: 100svh; }
+  #c { position: absolute; inset: 0; display: block; width: 100%; height: 100%;
+       touch-action: pan-y; /* 세로로 밀면 스크롤, 그 외엔 개미와 놀기 */
+       cursor: crosshair; -webkit-user-select: none; user-select: none;
+       -webkit-tap-highlight-color: transparent; }
+  .scroll-hint { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+       font: 400 11px/1 var(--mono); letter-spacing: .2em; color: var(--dim);
+       text-decoration: none; padding: 8px 12px; animation: bob 2s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translate(-50%, 5px); } }
+
+  /* ---------- 2. 평면도 ---------- */
+  #plan { min-height: 100vh; padding: clamp(72px, 12vh, 140px) clamp(16px, 5vw, 72px) 64px;
+          max-width: 1320px; margin: 0 auto; }
+  .plan-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px;
+               flex-wrap: wrap; border-bottom: 1px solid var(--faint); padding-bottom: 18px; margin-bottom: clamp(28px, 6vh, 56px); }
+  .plan-head h2 { margin: 0; font: 400 clamp(28px, 4.4vw, 56px)/1 var(--mono); letter-spacing: -0.02em; }
+  .plan-head p { margin: 0; font: 400 13px/1.7 var(--mono); color: var(--dim); }
+  .plan-head .hint { color: var(--fg); }
+
+  .plan-wrap { position: relative; }
+  #map { display: block; width: 100%; height: auto; max-height: 86svh; overflow: visible; }
+  #map .grid line { stroke: var(--faint); stroke-width: 1; }
+  #map .axis { stroke: rgba(244,242,238,.28); stroke-width: 1; stroke-dasharray: 6 6; }
+  #map .wall { fill: none; stroke: var(--fg); stroke-width: 2.4; stroke-linejoin: miter; }
+  #map .room { fill: #000; stroke: var(--fg); stroke-width: 1.8; }
+  #map .dash { fill: none; stroke: rgba(244,242,238,.45); stroke-width: 1.2; stroke-dasharray: 8 7; }
+  #map .vert { fill: #000; stroke: var(--fg); stroke-width: 1.6; }
+
+  /* 선이 그려지는 등장 애니메이션 */
+  #map .draw { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 1.6s cubic-bezier(.6,0,.2,1); }
+  #map.in .draw { stroke-dashoffset: 0; }
+  #map .room.draw { fill-opacity: 0; transition: stroke-dashoffset 1.4s cubic-bezier(.6,0,.2,1), fill-opacity .6s .9s; }
+  #map.in .room.draw { fill-opacity: 1; }
+  #map .dash.draw { stroke-dasharray: 8 7; stroke-dashoffset: 0; opacity: 0; transition: opacity .8s 1.2s; }
+  #map.in .dash.draw { opacity: 1; }
+
+  /* 작가 원 */
+  .dot { cursor: pointer; outline: none; }
+  .dot .hit { fill: transparent; }
+  .dot .ring { fill: #000; stroke: var(--fg); stroke-width: 2.2;
+               transform-box: fill-box; transform-origin: center; transform: scale(0);
+               transition: transform .5s cubic-bezier(.3,1.6,.5,1), fill .2s; }
+  #map.in .dot .ring { transform: scale(1); }
+  .dot .pulse { fill: none; stroke: var(--fg); stroke-width: 1.2; opacity: 0;
+                transform-box: fill-box; transform-origin: center; }
+  #map.in .dot .pulse { animation: pulse 2.8s ease-out infinite; animation-delay: var(--d, 0s); }
+  @keyframes pulse { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(1.9); opacity: 0; } }
+  .dot .name { fill: var(--fg); font: 600 21px var(--sans); text-anchor: middle; dominant-baseline: central;
+               opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .dot:hover .ring, .dot:focus-visible .ring, .dot.hl .ring { transform: scale(1.18); }
+  .dot:hover .name, .dot:focus-visible .name, .dot.hl .name { opacity: 1; }
+  .dot.active .ring { fill: var(--fg); }
+  .dot.active .name { fill: #000; opacity: 1; }
+  .dot:focus-visible .ring { stroke-width: 4; }
+
+  /* 작가 목록 */
+  .index { list-style: none; margin: clamp(36px, 7vh, 64px) 0 0; padding: 18px 0 0; border-top: 1px solid var(--faint);
+           display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 16px; }
+  .index button { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; display: flex; gap: 12px; align-items: baseline;
+                  padding: 10px 0; border-bottom: 1px solid transparent; font: 600 17px var(--sans); }
+  .index button span { font: 400 11px var(--mono); color: var(--dim); }
+  .index button:hover, .index button:focus-visible, .index button.active { border-bottom-color: var(--fg); }
+  .site-foot { margin-top: 72px; font: 400 11px/1.8 var(--mono); color: var(--dim); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+  /* ---------- 3. 작가노트 패널 ---------- */
+  #scrim { position: fixed; inset: 0; background: rgba(0,0,0,.55); opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 9; }
+  #scrim.open { opacity: 1; pointer-events: auto; }
+  #sheet { position: fixed; top: 0; right: 0; height: 100%; width: min(460px, 100%); z-index: 10;
+           background: #000; border-left: 1px solid var(--fg); display: flex; flex-direction: column;
+           transform: translateX(102%); transition: transform .45s cubic-bezier(.7,0,.2,1); visibility: hidden; }
+  #sheet.open { transform: none; visibility: visible; }
+  .sheet-bar { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px;
+               border-bottom: 1px solid var(--faint); font: 400 12px var(--mono); color: var(--dim); }
+  .sheet-bar button { all: unset; cursor: pointer; font: 400 26px/1 var(--mono); color: var(--fg); padding: 4px 8px; margin: -4px -8px; }
+  .sheet-body { flex: 1; overflow-y: auto; padding: 28px 24px 40px; overscroll-behavior: contain; }
+  .s-kicker { margin: 0 0 6px; font: 400 11px var(--mono); letter-spacing: .2em; color: var(--dim); }
+  #s-name { margin: 0; font: 700 clamp(40px, 9vw, 56px)/1.05 var(--sans); letter-spacing: -0.02em; }
+  #s-title { margin: 18px 0 4px; font: 600 19px/1.4 var(--sans); }
+  #s-medium { margin: 0; font: 400 12px/1.6 var(--mono); color: var(--dim); }
+  #s-fig { margin: 24px 0 0; aspect-ratio: 4 / 3; border: 1px dashed var(--faint); display: grid; place-items: center;
+           font: 400 11px var(--mono); color: var(--dim); overflow: hidden; }
+  #s-fig img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #s-fig.has-img { border: 0; }
+  .sheet-body h3 { margin: 34px 0 10px; font: 700 11px var(--mono); letter-spacing: .2em; color: var(--dim);
+                   padding-bottom: 8px; border-bottom: 1px solid var(--faint); }
+  .sheet-body .txt p { margin: 0 0 1em; font: 400 15px/1.85 var(--sans); word-break: keep-all; }
+  .sheet-body .txt.placeholder p { color: var(--dim); }
+  #s-link { display: inline-block; margin-top: 18px; font: 400 12px var(--mono); color: var(--fg); }
+  #s-link:empty { display: none; }
+  .sheet-nav { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--faint); }
+  .sheet-nav button { all: unset; cursor: pointer; padding: 18px 20px; font: 400 12px var(--mono); }
+  .sheet-nav button + button { text-align: right; border-left: 1px solid var(--faint); }
+  .sheet-nav button:hover, .sheet-nav button:focus-visible { background: var(--fg); color: #000; }
+
+  /* 폰: 아래에서 올라오는 시트 */
+  @media (max-width: 640px) {
+    #sheet { top: auto; bottom: 0; height: 88svh; width: 100%; border-left: 0; border-top: 1px solid var(--fg);
+             transform: translateY(102%); }
+    .sheet-body { padding: 22px 20px 32px; }
+    .plan-head { align-items: flex-start; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
+
+<section id="poster" aria-label="DEBUG 포스터">
+  <canvas id="c"></canvas>
+  <a class="scroll-hint" href="#plan">SCROLL ↓</a>
+</section>
+
+<section id="plan" aria-labelledby="plan-title">
+  <header class="plan-head">
+    <h2 id="plan-title">FLOOR PLAN</h2>
+    <p>연세대학교 무악로터리 B1<br><span class="hint">원을 누르면 작가노트를 볼 수 있어요</span></p>
+  </header>
+  <div class="plan-wrap">
+    <svg id="map" role="group" aria-label="전시장 평면도" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+  <ul class="index" id="index" aria-label="참여 작가"></ul>
+  <footer class="site-foot">
+    <span>DEBUG — Digital Art Exhibition 2026</span>
+    <span>2026.12.3 (THU) – 12.6 (SUN) · 10:00 – 18:00</span>
+  </footer>
+</section>
+
+<div id="scrim"></div>
+<aside id="sheet" role="dialog" aria-modal="true" aria-labelledby="s-name" aria-hidden="true">
+  <div class="sheet-bar"><span id="s-count">01 / 09</span><button id="s-close" aria-label="닫기">×</button></div>
+  <div class="sheet-body">
+    <p class="s-kicker">ARTIST</p>
+    <h2 id="s-name"></h2>
+    <p id="s-title"></p>
+    <p id="s-medium"></p>
+    <figure id="s-fig"></figure>
+    <h3>작가노트 · ARTIST NOTE</h3>
+    <div class="txt" id="s-note"></div>
+    <h3>작품 설명 · ABOUT THE WORK</h3>
+    <div class="txt" id="s-desc"></div>
+    <a id="s-link" target="_blank" rel="noopener"></a>
+  </div>
+  <nav class="sheet-nav"><button id="s-prev">← 이전 작가</button><button id="s-next">다음 작가 →</button></nav>
+</aside>
+
 <script>
+
 /* =========================================================
    DEBUG — 개미 인터랙티브 포스터
    - 검은 개미들이 DEBUG 글자를 만들려고 계속 돌아옴
@@ -57,6 +212,8 @@ const imgBody = new Image(); imgBody.src = IMG_BODY;
 const imgHead = new Image(); imgHead.src = IMG_HEAD;
 
 let ants = [];
+let posterOn = true;
+if (window.IntersectionObserver) new IntersectionObserver(es => { posterOn = es[0].isIntersecting; }).observe(canvas);
 const mouse = { x: -9999, y: -9999, down: false, inside: false, touch: false };
 const shocks = [];
 let t = 0;
@@ -324,7 +481,7 @@ function drawAnts() {
 function renderBg() {
   bg.width = canvas.width; bg.height = canvas.height;
   bgx.setTransform(1, 0, 0, 1, 0, 0);
-  bgx.fillStyle = '#0a0a0a';
+  bgx.fillStyle = '#000';
   bgx.fillRect(0, 0, bg.width, bg.height);
   bgx.setTransform(dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy);
   bgx.imageSmoothingQuality = 'high';
@@ -337,10 +494,11 @@ function renderBg() {
 }
 
 function resize() {
-  dpr = Math.min(window.devicePixelRatio || 1, 2);
   // 캔버스가 실제로 차지하는 크기 기준 (폰 주소창이 있어도 정확)
+  const nd = Math.min(window.devicePixelRatio || 1, 2);
   const rect = canvas.getBoundingClientRect();
-  vw = rect.width; vh = rect.height;
+  if (nd === dpr && rect.width === vw && rect.height === vh) return;
+  dpr = nd; vw = rect.width; vh = rect.height;
   canvas.width = Math.round(vw * dpr);
   canvas.height = Math.round(vh * dpr);
   k = Math.min(vw / PW, vh / PH);
@@ -373,7 +531,6 @@ window.addEventListener('pointercancel', () => { mouse.down = false; mouse.insid
 canvas.addEventListener('pointerleave', () => { mouse.inside = false; mouse.down = false; });
 window.addEventListener('keydown', e => { if (e.key === 'r' || e.key === 'R') scatterAll(); });
 window.addEventListener('resize', resize);
-if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
 if (window.ResizeObserver) new ResizeObserver(() => resize()).observe(canvas);
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -381,7 +538,9 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 let last = performance.now();
 function frame(now) {
   const dtf = Math.min(2.5, (now - last) / 16.667);
-  last = now; t += dtf;
+  last = now;
+  if (!posterOn) { requestAnimationFrame(frame); return; } // 화면 밖이면 쉼
+  t += dtf;
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(bg, 0, 0);
@@ -435,6 +594,241 @@ async function start() {
   requestAnimationFrame(t0 => { last = t0; requestAnimationFrame(frame); });
 }
 start();
+
+</script>
+
+<script>
+/* =========================================================
+   작가 정보 — 여기만 고치면 됩니다
+   - name: 평면도에 숨겨진 이름 (원에 마우스를 올리면 보임)
+   - x, y: 평면도 위 원의 위치 (아래 평면도 좌표 기준)
+   - title / medium / note / desc: 작품 제목, 매체·연도, 작가노트, 작품 설명
+     (문단은 빈 줄 하나로 구분)
+   - image: 작품 사진 주소 (예: 'images/yeonsu.jpg'), 없으면 '' 로 두기
+   - link: 인스타그램/포트폴리오 주소, 없으면 ''
+   - id: 주소 끝에 붙는 이름 → 예) .../#yeonsu 로 열면 바로 그 작가가 열림
+   ========================================================= */
+const ARTISTS = [
+  { id: 'yeonsu',    name: '연수', x: 95,  y: 46,  title: '', medium: '', image: '', link: '', note: '', desc: '' },
+  { id: 'sangmin',   name: '상민', x: 95,  y: 360, title: '', medium: '', image: '', link: '', note: '', desc: '' },
+  { id: 'chaerim',   name: '채림', x: 325, y: 384, title: '', medium: '', image: '', link: '', note: '', desc: '' },
+  { id: 'geonhyeok', name: '건혁', x: 452, y: 222, title: '', medium: '', image: '', link: '', note: '', desc: '' },
+  { id: 'seoyeon',   name: '서연', x: 566, y: 222, title: '', medium: '', image: '', link: '', note: '', desc: '' },
+  { id: 'sangwoong', name: '상웅', x: 739, y: 158, title: '', medium: '', image: '', link: '', note: '', desc: '' },
+  { id: 'yeeun',     name: '예은', x: 715, y: 421, title: '', medium: '', image: '', link: '', note: '', desc: '' },
+  { id: 'narim',     name: '나림', x: 876, y: 421, title: '', medium: '', image: '', link: '', note: '', desc: '' },
+  { id: 'hyeonjun',  name: '현준', x: 1062, y: 362, title: '', medium: '', image: '', link: '', note: '', desc: '' },
+];
+
+// 비어 있을 때 보여줄 안내 문구
+const PLACEHOLDER = {
+  title: '작품 제목',
+  medium: '매체 · 크기 · 2026',
+  note: '여기에 작가노트를 넣어 주세요.\n\n작업을 시작하게 된 계기, 붙잡고 있는 질문, 이번 전시에서 보여주고 싶은 것을 자유롭게 적으면 됩니다.',
+  desc: '여기에 작품 설명을 넣어 주세요.\n\n관객이 무엇을 보고 어떻게 경험하는지, 사용한 재료와 기술, 인터랙션 방법 등을 적으면 됩니다.',
+};
+
+/* ---------- 평면도 도형 (원본 도면을 따라 그린 좌표, 단위 = 픽셀) ---------- */
+const PLAN = {
+  outline: 'M0 0 H993 L1154 162 V453 H0 Z',
+  rooms: [               // [x, y, 너비, 높이]
+    [0, 0, 186, 93],       // 연수
+    [0, 269, 186, 184],    // 상민
+    [212, 314, 227, 139],  // 채림
+    [461, 135, 48, 184],   // 건혁 벽 1
+    [509, 135, 22, 184],   // 건혁 벽 2
+    [531, 158, 70, 139],   // 서연
+    [669, 88, 140, 140],   // 상웅
+    [646, 388, 138, 65],   // 예은
+    [784, 388, 185, 65],   // 나림
+    [969, 250, 185, 19],   // 현준 앞 선반
+    [969, 269, 185, 184],  // 현준
+  ],
+  dashes: ['M212 314 L439 453', 'M439 314 L212 453'],
+  verts: [[0,0],[186,0],[0,93],[0,111],[993,0],[1154,162],[1154,453],[0,453],[324,453]],
+  axes: ['M577 -58 V511', 'M-58 227 H1212'],
+};
+const DOT_R = 34;            // 원 반지름
+const VB = { x: -58, y: -58, w: 1270, h: 569 };
+
+const NS = 'http://www.w3.org/2000/svg';
+const map = document.getElementById('map');
+const el = (tag, attrs = {}, parent) => {
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+};
+const rectPath = ([x, y, w, h]) => `M${x} ${y} H${x + w} V${y + h} H${x} Z`;
+
+const root = el('g', {}, map);
+// 모눈
+const grid = el('g', { class: 'grid' }, root);
+for (let x = VB.x; x <= VB.x + VB.w; x += 57.7) el('line', { x1: x, y1: VB.y, x2: x, y2: VB.y + VB.h }, grid);
+for (let y = VB.y + 22; y <= VB.y + VB.h; y += 57.7) el('line', { x1: VB.x, y1: y, x2: VB.x + VB.w, y2: y }, grid);
+PLAN.axes.forEach(d => el('path', { d, class: 'axis' }, root));
+
+// 벽과 부스
+el('path', { d: PLAN.outline, class: 'wall draw', pathLength: 1 }, root);
+PLAN.rooms.forEach((r, i) => {
+  const p = el('path', { d: rectPath(r), class: 'room draw', pathLength: 1 }, root);
+  p.style.transitionDelay = `${0.25 + i * 0.07}s, ${0.9 + i * 0.05}s`;
+});
+PLAN.dashes.forEach(d => el('path', { d, class: 'dash draw' }, root));
+PLAN.verts.forEach(([x, y]) => el('circle', { cx: x, cy: y, r: 4.5, class: 'vert' }, root));
+
+// 작가 원
+const dots = ARTISTS.map((a, i) => {
+  const g = el('g', { class: 'dot', tabindex: 0, role: 'button', 'aria-label': `${a.name} 작가노트 보기`, 'data-i': i }, root);
+  el('circle', { cx: a.x, cy: a.y, r: DOT_R + 12, class: 'hit' }, g);
+  const pulse = el('circle', { cx: a.x, cy: a.y, r: DOT_R, class: 'pulse' }, g);
+  pulse.style.setProperty('--d', `${(i * 0.31) % 2.8}s`);
+  const ring = el('circle', { cx: a.x, cy: a.y, r: DOT_R, class: 'ring' }, g);
+  ring.style.transitionDelay = `${1.3 + i * 0.06}s`;
+  const label = el('text', { x: a.x, y: a.y + 1, class: 'name' }, g);
+  label.textContent = a.name;
+  g.addEventListener('click', () => openArtist(i));
+  g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openArtist(i); } });
+  g._label = label;
+  return g;
+});
+
+// 폰 세로 화면에선 평면도를 90° 돌려서 크게
+function layoutMap() {
+  const portrait = window.innerWidth < 720 && window.innerHeight > window.innerWidth;
+  if (portrait) {
+    map.setAttribute('viewBox', `${-(VB.y + VB.h)} ${VB.x} ${VB.h} ${VB.w}`);
+    root.setAttribute('transform', 'rotate(90)');
+  } else {
+    map.setAttribute('viewBox', `${VB.x} ${VB.y} ${VB.w} ${VB.h}`);
+    root.removeAttribute('transform');
+  }
+  dots.forEach((g, i) => {
+    const a = ARTISTS[i];
+    if (portrait) g._label.setAttribute('transform', `rotate(-90 ${a.x} ${a.y})`);
+    else g._label.removeAttribute('transform');
+  });
+}
+layoutMap();
+window.addEventListener('resize', layoutMap);
+
+// 화면에 들어오면 선 그리기 시작
+if (window.IntersectionObserver) {
+  new IntersectionObserver((es, ob) => {
+    if (es[0].isIntersecting) {
+      map.classList.add('in');
+      // 등장이 끝나면 원의 지연을 지워서 마우스 반응을 즉각적으로
+      setTimeout(() => dots.forEach(g => g.querySelector('.ring').style.transitionDelay = '0s'), 2600);
+      ob.disconnect();
+    }
+  }, { threshold: 0.25 }).observe(map);
+} else map.classList.add('in');
+
+// 작가 목록
+const index = document.getElementById('index');
+const listBtns = ARTISTS.map((a, i) => {
+  const li = document.createElement('li');
+  const b = document.createElement('button');
+  b.innerHTML = `<span>${String(i + 1).padStart(2, '0')}</span>`;
+  b.append(a.name);
+  b.addEventListener('click', () => openArtist(i));
+  b.addEventListener('mouseenter', () => dots[i].classList.add('hl'));
+  b.addEventListener('mouseleave', () => dots[i].classList.remove('hl'));
+  li.appendChild(b); index.appendChild(li);
+  return b;
+});
+
+/* ---------- 작가노트 패널 ---------- */
+const sheet = document.getElementById('sheet');
+const scrim = document.getElementById('scrim');
+const $ = id => document.getElementById(id);
+let current = -1, lastFocus = null;
+
+function fillText(node, text, placeholder) {
+  node.textContent = '';
+  const empty = !text || !text.trim();
+  node.classList.toggle('placeholder', empty);
+  (empty ? placeholder : text).split(/\n\s*\n/).forEach(par => {
+    const p = document.createElement('p');
+    p.textContent = par.trim();
+    node.appendChild(p);
+  });
+}
+
+function openArtist(i) {
+  i = (i + ARTISTS.length) % ARTISTS.length;
+  const a = ARTISTS[i];
+  if (current < 0) lastFocus = document.activeElement;
+  current = i;
+  $('s-count').textContent = `${String(i + 1).padStart(2, '0')} / ${String(ARTISTS.length).padStart(2, '0')}`;
+  $('s-name').textContent = a.name;
+  $('s-title').textContent = a.title || PLACEHOLDER.title;
+  $('s-title').style.color = a.title ? '' : 'var(--dim)';
+  $('s-medium').textContent = a.medium || PLACEHOLDER.medium;
+  const fig = $('s-fig');
+  fig.textContent = '';
+  fig.classList.toggle('has-img', !!a.image);
+  if (a.image) {
+    const img = new Image(); img.src = a.image; img.alt = `${a.name} — ${a.title || '작품 이미지'}`; img.loading = 'lazy';
+    fig.appendChild(img);
+  } else fig.textContent = 'IMAGE';
+  fillText($('s-note'), a.note, PLACEHOLDER.note);
+  fillText($('s-desc'), a.desc, PLACEHOLDER.desc);
+  const link = $('s-link');
+  link.textContent = a.link ? `${a.link.replace(/^https?:\/\//, '')} ↗` : '';
+  if (a.link) link.href = a.link; else link.removeAttribute('href');
+  sheet.querySelector('.sheet-body').scrollTop = 0;
+
+  dots.forEach((g, j) => g.classList.toggle('active', j === i));
+  listBtns.forEach((b, j) => b.classList.toggle('active', j === i));
+  sheet.classList.add('open'); scrim.classList.add('open');
+  sheet.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('locked');
+  history.replaceState(null, '', '#' + a.id);
+  $('s-close').focus({ preventScroll: true });
+}
+
+function closeArtist() {
+  if (current < 0) return;
+  current = -1;
+  sheet.classList.remove('open'); scrim.classList.remove('open');
+  sheet.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('locked');
+  dots.forEach(g => g.classList.remove('active'));
+  listBtns.forEach(b => b.classList.remove('active'));
+  history.replaceState(null, '', location.pathname + location.search);
+  if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
+}
+
+$('s-close').addEventListener('click', closeArtist);
+scrim.addEventListener('click', closeArtist);
+$('s-prev').addEventListener('click', () => openArtist(current - 1));
+$('s-next').addEventListener('click', () => openArtist(current + 1));
+window.addEventListener('keydown', e => {
+  if (current < 0) return;
+  if (e.key === 'Escape') closeArtist();
+  if (e.key === 'ArrowLeft') openArtist(current - 1);
+  if (e.key === 'ArrowRight') openArtist(current + 1);
+});
+// 패널 안에서 Tab 키가 밖으로 나가지 않게
+sheet.addEventListener('keydown', e => {
+  if (e.key !== 'Tab') return;
+  const f = [...sheet.querySelectorAll('button, a[href]')];
+  const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+
+// 주소에 #작가id 가 있으면 (QR 코드 등) 평면도로 내려가서 바로 열기
+function openFromHash() {
+  const id = decodeURIComponent(location.hash.slice(1));
+  const i = ARTISTS.findIndex(a => a.id === id);
+  if (i >= 0) {
+    document.getElementById('plan').scrollIntoView();
+    openArtist(i);
+  }
+}
+openFromHash();
 </script>
 </body>
 </html>
