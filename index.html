@@ -8,8 +8,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=block" rel="stylesheet">
 <style>
-  html, body { margin: 0; height: 100%; background: #0a0a0a; overflow: hidden; }
-  canvas { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: crosshair; }
+  html, body { margin: 0; height: 100%; background: #0a0a0a; overflow: hidden; overscroll-behavior: none; }
+  /* 폰 주소창 높이 차이로 터치 좌표가 어긋나지 않게 화면에 고정 */
+  canvas { position: fixed; inset: 0; display: block; width: 100%; height: 100%;
+           touch-action: none; cursor: crosshair; -webkit-user-select: none; user-select: none;
+           -webkit-tap-highlight-color: transparent; }
 </style>
 </head>
 <body>
@@ -54,7 +57,7 @@ const imgBody = new Image(); imgBody.src = IMG_BODY;
 const imgHead = new Image(); imgHead.src = IMG_HEAD;
 
 let ants = [];
-const mouse = { x: -9999, y: -9999, down: false, inside: false };
+const mouse = { x: -9999, y: -9999, down: false, inside: false, touch: false };
 const shocks = [];
 let t = 0;
 
@@ -181,7 +184,7 @@ function updateAnt(a, dtf) {
 
   // 마우스 회피
   if (mouse.inside) {
-    const R = mouse.down ? CFG.fleeRadiusHold : CFG.fleeRadius;
+    const R = fleeR();
     const mx = a.x - mouse.x, my = a.y - mouse.y;
     const md2 = mx * mx + my * my;
     if (md2 < R * R) {
@@ -335,7 +338,9 @@ function renderBg() {
 
 function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, 2);
-  vw = window.innerWidth; vh = window.innerHeight;
+  // 캔버스가 실제로 차지하는 크기 기준 (폰 주소창이 있어도 정확)
+  const rect = canvas.getBoundingClientRect();
+  vw = rect.width; vh = rect.height;
   canvas.width = Math.round(vw * dpr);
   canvas.height = Math.round(vh * dpr);
   k = Math.min(vw / PW, vh / PH);
@@ -349,17 +354,28 @@ function toPoster(e) {
   const r = canvas.getBoundingClientRect();
   return { x: (e.clientX - r.left - ox) / k, y: (e.clientY - r.top - oy) / k };
 }
+// 손가락은 마우스보다 굵어서 폰에선 반경을 키움
+function fleeR() {
+  if (mouse.touch) return CFG.fleeRadiusHold * 1.1;
+  return mouse.down ? CFG.fleeRadiusHold : CFG.fleeRadius;
+}
 canvas.addEventListener('pointermove', e => {
+  mouse.touch = e.pointerType === 'touch';
   const p = toPoster(e); mouse.x = p.x; mouse.y = p.y; mouse.inside = true;
 });
 canvas.addEventListener('pointerdown', e => {
+  mouse.touch = e.pointerType === 'touch';
   const p = toPoster(e); mouse.x = p.x; mouse.y = p.y; mouse.inside = true; mouse.down = true;
   shocks.push({ x: p.x, y: p.y, r: 0, life: 1, fresh: true });
 });
-window.addEventListener('pointerup', () => { mouse.down = false; });
+window.addEventListener('pointerup', e => { mouse.down = false; if (e.pointerType === 'touch') mouse.inside = false; });
+window.addEventListener('pointercancel', () => { mouse.down = false; mouse.inside = false; });
 canvas.addEventListener('pointerleave', () => { mouse.inside = false; mouse.down = false; });
 window.addEventListener('keydown', e => { if (e.key === 'r' || e.key === 'R') scatterAll(); });
 window.addEventListener('resize', resize);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+if (window.ResizeObserver) new ResizeObserver(() => resize()).observe(canvas);
+canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 // ---------- 루프 ----------
 let last = performance.now();
@@ -393,7 +409,7 @@ function frame(now) {
 
   // 마우스 반경 표시 (디버거 렌즈)
   if (mouse.inside) {
-    const R = mouse.down ? CFG.fleeRadiusHold : CFG.fleeRadius;
+    const R = fleeR();
     const onHeader = mouse.y < HEADER_H;
     ctx.beginPath();
     ctx.arc(mouse.x, mouse.y, R, 0, Math.PI * 2);
