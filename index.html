@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DEBUG — Digital Art Exhibition 2026</title>
-<meta name="description" content="DEBUG 연세대학교 디지털아트학교 16회 졸업전시 2026 · 12.03–12.06 · 백양누리 B1 무악로타리홀">
+<meta name="description" content="DEBUG 연세대학교 디지털아트학과 16회 졸업전시 2026 · 12.03–12.06 · 백양누리 B1 무악로타리홀">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=block" rel="stylesheet">
@@ -25,7 +25,7 @@
   body.locked { overflow: hidden; }
 
   /* ---------- 1. 포스터 ---------- */
-  #poster { position: relative; height: 100vh; height: 100svh; }
+  #poster { position: relative; height: 100vh; height: 100svh; background: #000; }
   #c { position: absolute; inset: 0; display: block; width: 100%; height: 100%; outline: none;
        touch-action: pan-y; /* 세로로 밀면 스크롤, 그 외엔 개미와 놀기 */
        cursor: crosshair; -webkit-user-select: none; user-select: none;
@@ -115,7 +115,6 @@
   .sheet-nav button + button { text-align: right; border-left: 1px solid var(--faint); }
   .sheet-nav button:hover, .sheet-nav button:focus-visible { background: var(--fg); color: #000; }
 
-  /* 폰: 아래에서 올라오는 시트 */
   @media (max-width: 640px) {
     #sheet { top: auto; bottom: 0; height: 88svh; width: 100%; border-left: 0; border-top: 1px solid var(--fg);
              transform: translateY(102%); }
@@ -130,7 +129,7 @@
 <body>
 
 <section id="poster" aria-label="DEBUG 포스터">
-  <canvas id="c" tabindex="0" aria-label="DEBUG 포스터 — 클릭하면 검은 면이 개미가 되어 흩어집니다"></canvas>
+  <canvas id="c" tabindex="0" aria-label="DEBUG 포스터 — 클릭하면 개미들이 모이거나 흩어집니다"></canvas>
   <a id="hint" href="#plan">CLICK</a>
 </section>
 
@@ -144,7 +143,7 @@
   </div>
   <ul class="index" id="index" aria-label="참여 작가"></ul>
   <footer class="site-foot">
-    <span>DEBUG — 연세대학교 디지털아트학교 16회 졸업전시</span>
+    <span>DEBUG — 연세대학교 디지털아트학과 16회 졸업전시</span>
     <span>2026.12.03 (Thu) – 12.06 (Sun) · 10:00 – 18:00</span>
   </footer>
 </section>
@@ -168,34 +167,34 @@
 <script>
 (() => {
 /* =========================================================
-   DEBUG 포스터 v2 (새 이미지 파일 2종 적용 + 시작 시 개미가 몰려와 검정으로 덮음)
-   - IMG_PHOTO: debug 최최최최종종RGB웹-100.jpg (현장 배경 사진)
-   - IMG_TEXT:  debug 최최최최종종BLACK -100.jpg (하단 텍스트 영역 자동 투명 추출)
+   DEBUG 포스터 v2
+   - 시작할 때 (클릭 없이도) 덮여 있던 검정 면이 개미가 되어 흩어지며 작업실 사진이 드러남
+   - 클릭하면 개미들이 다시 몰려와 검정을 덮음 (실금 없이 완벽 밀착)
+   - 다시 클릭하면 또 개미들이 흩어져 사라짐
    ========================================================= */
-const PW = 1191, PH = 1684;   // 포스터 기준 비율 크기
-const TEXT_Y = 1150;          // 글자 레이어가 시작되는 y
+const PW = 1191, PH = 1684;   // 포스터 원본 크기
+const TEXT_Y = 1180;          // 글자 레이어가 시작되는 y
 const small = Math.min(window.innerWidth, window.innerHeight) < 700;
 
 // ---------- 조절용 값 ----------
 const CFG = {
-  cell: small ? 20 : 16,     // 검정 면을 나누는 칸 크기 = 개미 한 마리 몫 (작을수록 개미 많음)
+  cell: small ? 20 : 16,     // 검정 면을 나누는 칸 크기 = 개미 한 마리 몫
   antLen: small ? 30 : 25,   // 개미 몸길이
-  waveSpeed: 24,             // 클릭 지점에서 퍼져 나가는 속도
+  waveSpeed: 24,             // 퍼져 나가는 속도
   waveJitter: 110,           // 퍼지는 경계의 들쭉날쭉함
   fadeOut: 14,               // 칸이 개미로 바뀌며 사라지는 시간(프레임)
   fadeIn: 8,                 // 개미가 돌아와 칸이 다시 채워지는 시간
-  stayers: small ? 25 : 45,  // (이름 개미 말고) 사진 위에 남아서 돌아다니는 작은 개미 수
+  stayers: small ? 25 : 45,  // 사진 위에 남아서 돌아다니는 작은 개미 수
   names: ['정현준', '이건혁', '정나림', '전상웅', '윤서연', '박상민', '노연수', '신예은'],
-  nameScale: 3,              // 이름 개미 크기 (일반 개미 대비 배수)
+  nameScale: 1.5,            // 이름 개미 크기 (기존 대비 0.5배)
   nameSpeed: 1.3,            // 이름 개미 걷는 속도
   fleeRadius: 90,            // 마우스 회피 반경
   fleeRadiusTouch: 150,      // 손가락 회피 반경
   ink: '#000',
 };
 
-// 새로 업로드한 두 이미지 파일 연결 (HTML 파일과 같은 폴더에 넣어주세요)
 const IMG_PHOTO = 'debug 최최최최종종RGB웹-100.jpg';
-const IMG_TEXT  = 'debug 최최최최종종BLACK -100.jpg';
+const IMG_TEXT  = 'debug 최최최최종종BLACK웹-100.jpg';
 
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
@@ -215,27 +214,30 @@ function angLerp(a, b, f) {
   return a + d * f;
 }
 
-// ---------- 검정 면 = 칸들의 모음 (처음엔 투명 a: 0, ta: 0 으로 시작해 현장 사진이 먼저 보임) ----------
+// ---------- 검정 면 = 칸들의 모음 ----------
 const C = CFG.cell;
 const cells = [];
 for (let y = 0; y < PH; y += C) {
   for (let x = 0; x < PW; x += C) {
     cells.push({ x, y, w: Math.min(C, PW - x), h: Math.min(C, PH - y),
                  cx: x + Math.min(C, PW - x) / 2, cy: y + Math.min(C, PH - y) / 2,
-                 a: 0, ta: 0, ant: null, wd: 0 });
+                 a: 1, ta: 1, ant: null, wd: 0 });
   }
 }
 const fading = new Set();
 let ants = [], nameAnts = [];
-let state = 'out';
+let state = 'cover';            // 'cover' | 'out' | 'in'
 let wave = null, pending = [], pIdx = 0;
 let t = 0, dirty = true;
 const mouse = { x: -9999, y: -9999, inside: false, touch: false };
 
 function paintCell(c) {
   const s = k * dpr;
-  const x0 = Math.floor(c.x * s), x1 = Math.floor((c.x + c.w) * s);
-  const y0 = Math.floor(c.y * s), y1 = Math.floor((c.y + c.h) * s);
+  const x0 = Math.floor(c.x * s);
+  const y0 = Math.floor(c.y * s);
+  // ★ 우측·하단 끝 칸은 cover 캔버스 끝까지 덮어 소수점 반올림 실금 원천 차단
+  const x1 = c.x + c.w >= PW ? cover.width : Math.ceil((c.x + c.w) * s);
+  const y1 = c.y + c.h >= PH ? cover.height : Math.ceil((c.y + c.h) * s);
   cvx.clearRect(x0, y0, x1 - x0, y1 - y0);
   if (c.a > 0) {
     cvx.globalAlpha = c.a;
@@ -250,7 +252,7 @@ function makeAnt(x, y, cell, mode) {
     x, y, vx: 0, vy: 0, cell, mode,
     h: rand(0, Math.PI * 2), dir: 0,
     size: rand(0.85, 1.15),
-    maxS: mode === 'home' ? rand(5.5, 8.8) : rand(4.5, 8.5),
+    maxS: mode === 'home' ? rand(5, 8) : rand(4.5, 8.5),
     phase: rand(0, 6.28), seed: rand(0, 1000),
     delay: 0, panic: 0, move: 0, wt: 0, wdir: rand(0, 6.28),
   };
@@ -259,7 +261,6 @@ function makeAnt(x, y, cell, mode) {
   return a;
 }
 
-// 클릭 → 검정이 개미로 부서지며 흩어짐
 function startOut(px, py) {
   state = 'out';
   wave = { x: px, y: py, r: 0 };
@@ -286,7 +287,6 @@ function startOut(px, py) {
   setHint();
 }
 
-// 이름 개미가 태어날 칸을 서로 떨어지게 고름
 function assignNames() {
   cells.forEach(c => { c.name = null; });
   const alive = new Set(ants.filter(a => a.name).map(a => a.name));
@@ -310,7 +310,6 @@ function activate(c, stayProb) {
   a.delay = rand(0, 12);
 }
 
-// 시작할 때 / 다시 클릭할 때 → 사방에서 개미들이 몰려와 검정을 채움
 function startIn() {
   state = 'in';
   pending = []; pIdx = 0; wave = null;
@@ -318,14 +317,14 @@ function startIn() {
     if (c.ta === 1) continue;
     if (c.ant) {
       c.ant.mode = 'home';
-      c.ant.maxS = rand(5.5, 8.8);
+      c.ant.maxS = rand(5, 8);
       c.ant.delay = rand(0, 15);
       continue;
     }
     const dl = c.cx, dr = PW - c.cx, dt = c.cy, db = PH - c.cy;
     let edge = [dl, dr, dt, db].indexOf(Math.min(dl, dr, dt, db));
     if (Math.random() < 0.25) edge = (Math.random() * 4) | 0;
-    const off = rand(25, 240);
+    const off = rand(30, 260);
     let x, y;
     if (edge === 0) { x = -off; y = c.cy + rand(-120, 120); }
     else if (edge === 1) { x = PW + off; y = c.cy + rand(-120, 120); }
@@ -333,7 +332,7 @@ function startIn() {
     else { y = PH + off; x = c.cx + rand(-120, 120); }
     const a = makeAnt(x, y, c, 'home');
     a.h = Math.atan2(c.cy - y, c.cx - x);
-    a.delay = rand(0, 38);
+    a.delay = rand(0, 45);
   }
   setHint();
 }
@@ -357,8 +356,8 @@ function updateAnt(a, dtf) {
       a.wdir = a.name ? (Math.cos(a.h) >= 0 ? 0 : Math.PI) + rand(-0.3, 0.3) : a.h + rand(-1.2, 1.2);
     }
     a.wdir += Math.sin(t * 0.03 + a.seed) * (a.name ? 0.012 : 0.03);
-    const mg = a.name ? 90 : 30, ws = a.name ? CFG.nameSpeed : 1.5;
-    const yMax = a.name ? 1130 : PH - 30;
+    const mg = a.name ? 60 : 30, ws = a.name ? CFG.nameSpeed : 1.5;
+    const yMax = a.name ? 1140 : PH - 30;
     if (a.x < mg) a.wdir = rand(-0.4, 0.4); else if (a.x > PW - mg) a.wdir = Math.PI + rand(-0.4, 0.4);
     if (a.y < mg) a.wdir = a.name ? (Math.cos(a.wdir) >= 0 ? 0.35 : Math.PI - 0.35) : Math.PI / 2;
     else if (a.y > yMax) a.wdir = a.name ? (Math.cos(a.wdir) >= 0 ? -0.35 : Math.PI + 0.35) : -Math.PI / 2;
@@ -384,7 +383,7 @@ function updateAnt(a, dtf) {
     for (const o of nameAnts) {
       if (o === a) continue;
       const dx = a.x - o.x, dy = (a.y - o.y) * 1.8, d = Math.hypot(dx, dy);
-      if (d < 130 && d > 0.01) { const f = (1 - d / 130) * 0.25; ax += dx / d * f; ay += dy / d * f; }
+      if (d < 85 && d > 0.01) { const f = (1 - d / 85) * 0.25; ax += dx / d * f; ay += dy / d * f; }
     }
   }
 
@@ -394,7 +393,7 @@ function updateAnt(a, dtf) {
     if (a.age > 150 || Math.hypot(a.cell.cx - a.x, a.cell.cy - a.y) < CFG.fleeRadiusTouch * 1.3) scared = false;
   } else a.age = 0;
   if (scared) {
-    const R = (mouse.touch ? CFG.fleeRadiusTouch : CFG.fleeRadius) + (a.name ? 50 : 0);
+    const R = (mouse.touch ? CFG.fleeRadiusTouch : CFG.fleeRadius) + (a.name ? 30 : 0);
     const mx = a.x - mouse.x, my = a.y - mouse.y, md2 = mx * mx + my * my;
     if (md2 < R * R) {
       const md = Math.sqrt(md2) || 0.001;
@@ -414,7 +413,7 @@ function updateAnt(a, dtf) {
 
   const s2 = Math.hypot(a.vx, a.vy);
   if (s2 > 0.12) a.h = angLerp(a.h, Math.atan2(a.vy, a.vx), Math.min(1, 0.22 * dtf));
-  a.phase += s2 * (a.name ? 0.16 : 0.42) * dtf;
+  a.phase += s2 * (a.name ? 0.24 : 0.42) * dtf;
   a.move = Math.min(1, s2 / 1.2);
 
   if (a.mode === 'flee' && (a.x < -50 || a.x > PW + 50 || a.y < -50 || a.y > PH + 50)) {
@@ -534,46 +533,47 @@ function drawNameAnt(a) {
   ctx.fillText(a.name, 0, NAME_FS * 0.04);
 }
 
-// ---------- 레이어 준비 (JPG 블랙 포스터에서 흰색 글자 레이어 자동 추출 포함) ----------
+// ---------- 레이어 준비 (우측/하단 1px 실금 완벽 방지 처리) ----------
 function resize(force) {
   const nd = Math.min(window.devicePixelRatio || 1, 2);
   const r = canvas.getBoundingClientRect();
   if (!force && nd === dpr && r.width === vw && r.height === vh) return;
   dpr = nd; vw = r.width; vh = r.height;
   canvas.width = Math.round(vw * dpr); canvas.height = Math.round(vh * dpr);
+
   k = Math.min(vw / PW, vh / PH);
-  ox = (vw - PW * k) / 2; oy = (vh - PH * k) / 2;
+  ox = (vw - PW * k) / 2;
+  oy = (vh - PH * k) / 2;
   const s = k * dpr;
+  const px = Math.round(dpr * ox), py = Math.round(dpr * oy);
+  const pw = Math.round(PW * s), ph = Math.round(PH * s);
 
   bg.width = canvas.width; bg.height = canvas.height;
   bgx.fillStyle = '#000'; bgx.fillRect(0, 0, bg.width, bg.height);
   bgx.imageSmoothingQuality = 'high';
-  if (photo.naturalWidth) bgx.drawImage(photo, dpr * ox, dpr * oy, PW * s, PH * s);
+  if (photo.naturalWidth) {
+    bgx.save();
+    bgx.beginPath();
+    bgx.rect(px, py, pw, ph);
+    bgx.clip();
+    bgx.drawImage(photo, px, py, pw, ph);
+    bgx.restore();
+  }
 
-  cover.width = Math.floor(PW * s); cover.height = Math.floor(PH * s);
+  // ★ cover 캔버스에 2px 여유분을 두어 배경 사진 우측/하단 끝이 절대 비어 보이지 않도록 함
+  cover.width = pw + 2; cover.height = ph + 2;
   cvx.fillStyle = CFG.ink;
   for (const c of cells) if (c.a > 0) paintCell(c);
 
-  fg.width = Math.ceil(PW * s); fg.height = Math.ceil((PH - TEXT_Y) * s);
+  fg.width = pw; fg.height = Math.ceil((PH - TEXT_Y) * s);
   fgx.clearRect(0, 0, fg.width, fg.height);
   fgx.imageSmoothingQuality = 'high';
   if (txt.naturalWidth) {
-    // 전체 비율 이미지(JPG)인 경우 하단 글자 영역만 크롭하여 그린 뒤 검정 배경을 투명화
     const isFullPoster = txt.naturalHeight > txt.naturalWidth;
     if (isFullPoster) {
       const sy = (TEXT_Y / PH) * txt.naturalHeight;
       const sh = ((PH - TEXT_Y) / PH) * txt.naturalHeight;
       fgx.drawImage(txt, 0, sy, txt.naturalWidth, sh, 0, 0, fg.width, fg.height);
-      try {
-        const imgData = fgx.getImageData(0, 0, fg.width, fg.height);
-        const d = imgData.data;
-        for (let i = 0; i < d.length; i += 4) {
-          const lum = (d[i] + d[i + 1] + d[i + 2]) / 3;
-          d[i] = 255; d[i + 1] = 255; d[i + 2] = 255;
-          d[i + 3] = lum < 25 ? 0 : Math.min(255, (lum - 25) * 1.15);
-        }
-        fgx.putImageData(imgData, 0, 0);
-      } catch (err) { /* 로컬 file:// 보안 제한 시 원본 유지 */ }
     } else {
       fgx.drawImage(txt, 0, 0, fg.width, fg.height);
     }
@@ -646,22 +646,30 @@ function frame(now) {
   }
   if (state === 'in' && !ants.length && !fading.size) { state = 'cover'; setHint(); }
 
+  const px = Math.round(dpr * ox), py = Math.round(dpr * oy);
+  const pw = Math.round(PW * k * dpr), ph = Math.round(PH * k * dpr);
+
+  // 그리기: 사진 → 검정 덮개 → 개미 → 하단 글자(screen 합성)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(bg, 0, 0);
-  ctx.drawImage(cover, Math.round(dpr * ox), Math.round(dpr * oy));
+  ctx.drawImage(cover, px, py);
   ctx.save();
-  ctx.beginPath(); ctx.rect(dpr * ox, dpr * oy, PW * k * dpr, PH * k * dpr); ctx.clip();
+  ctx.beginPath(); ctx.rect(px, py, pw, ph); ctx.clip();
   drawAnts();
   ctx.restore();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(fg, Math.round(dpr * ox), Math.round(dpr * (oy + TEXT_Y * k)));
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.drawImage(fg, px, Math.round(dpr * (oy + TEXT_Y * k)));
+  ctx.restore();
   dirty = false;
 }
 
 (async () => {
   await Promise.all([photo.decode().catch(() => {}), txt.decode().catch(() => {})]);
   resize(true);
-  startIn(); // 시작하자마자 개미들이 사방에서 나와 검정으로 덮음
+  // 시작하자마자 클릭 없이도 검정 면이 개미가 되어 흩어지며 사라지는 모션 실행
+  startOut(PW / 2, PH * 0.45);
   requestAnimationFrame(t0 => { last = t0; requestAnimationFrame(frame); });
 })();
 })();
